@@ -1,8 +1,8 @@
-use std::io;
-use whitenoise_rpc::{DEFAULT_KEY_TYPE, client, logger};
-use whitenoisers::sdk::client::Client;
-use clap::{App, Arg, SubCommand};
-use std::path::Path;
+
+use whitenoise_rpc::{client, logger};
+
+use clap::{App, Arg};
+
 
 #[async_std::main]
 async fn main() {
@@ -18,7 +18,6 @@ async fn main() {
             .takes_value(true))
         .arg(Arg::with_name("id")
             .long("id")
-            .short("i")
             .help("WhiteNoise ID of the WhiteNoise RPC server")
             .takes_value(true))
         .arg(Arg::with_name("json")
@@ -33,7 +32,7 @@ async fn main() {
     let json_path = args.value_of("json").unwrap();
     let request =  std::fs::read_to_string(json_path).unwrap();
 
-    let response = async_std::task::block_on(client::send_request(bootstrap_addr, whitenosie_id.to_string(), request.to_string()));
+    let response = async_std::task::block_on(client::send_request(bootstrap_addr, whitenosie_id.to_string(), request));
 
     println!("response: {}", response);
 }

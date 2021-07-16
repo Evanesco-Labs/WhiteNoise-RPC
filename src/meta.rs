@@ -1,4 +1,4 @@
-use futures::channel::mpsc;
+
 use jsonrpc_core::Metadata;
 
 /// Request context

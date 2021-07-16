@@ -1,12 +1,12 @@
 use async_std::sync::Arc;
-use jsonrpc_core::{MetaIoHandler, middleware, Middleware, Metadata, Value};
+use jsonrpc_core::{MetaIoHandler, middleware, Middleware, Metadata};
 use whitenoisers::account::key_types::KeyType;
-use whitenoisers::sdk::client::{Client, WhiteNoiseClient};
+use whitenoisers::sdk::client::{Client};
 use std::io::Error;
-use futures::task::{Context, Poll};
-use std::pin::Pin;
-use futures::{Stream, StreamExt, AsyncRead, AsyncWrite};
-use whitenoisers::network::connection::CircuitConn;
+
+
+use futures::{StreamExt};
+
 use jsonrpc_core::futures::Future;
 use futures::future;
 use libp2p::bytes::BufMut;
@@ -43,7 +43,7 @@ impl<M: Metadata + Default, S: Middleware<M>> ServerBuilder<M, S> {
     //todo: over stack
     pub async fn start(&mut self) -> std::io::Result<Server> {
         //todo: stop
-        let (stop_sender, stop_rec) = futures::channel::oneshot::channel::<()>();
+        let (stop_sender, _stop_rec) = futures::channel::oneshot::channel::<()>();
 
         let rpc_handler = self.handler.clone();
         let mut client = whitenoisers::sdk::client::WhiteNoiseClient::init(self.bootstrap_addr.clone(), KeyType::ED25519, self.keypair.clone());
@@ -87,8 +87,8 @@ impl<M: Metadata + Default, S: Middleware<M>> ServerBuilder<M, S> {
                     let meta = extractor.extract(&RequestContext {
                         session_id: circuit.id.clone(),
                     });
-                    let response = handler.handle_request(&request, meta).wait().unwrap_or(Some({ "rpc handle err".to_string() }));
-                    let response_bytes = response.unwrap_or("response none".to_string()).as_bytes().to_vec();
+                    let response = handler.handle_request(&request, meta).wait().unwrap_or_else(|_|Some("rpc handle err".to_string()));
+                    let response_bytes = response.unwrap_or_else(||"response none".to_string()).as_bytes().to_vec();
                     let payload = wrap_message(&response_bytes);
                     let mut buf = [0u8; MAXRESPONSESIZE];
                     circuit.write(payload.as_slice(), &mut buf).await;
@@ -109,21 +109,6 @@ impl<M: Metadata + Default, S: Middleware<M>> ServerBuilder<M, S> {
     }
 }
 
-pub async fn start_test_server(bootstrap_addr: &str) -> std::io::Result<Server> {
-    let keypair = libp2p::identity::Keypair::generate_ed25519();
-    let mut io = test_handler();
-    let mut builder = ServerBuilder::new(bootstrap_addr, Some(keypair), io);
-    async_std::task::spawn(async move {
-        builder.start().await
-    }).await
-}
-
-pub fn test_handler() -> MetaIoHandler<()> {
-    let mut io = MetaIoHandler::<()>::default();
-    io.add_method("say_hello", |_params| Ok(Value::String("hello".to_string())));
-    io
-}
-
 pub fn wrap_message(message: &[u8]) -> Vec<u8> {
     let mut payload = Vec::with_capacity(4 + message.len());
     payload.put_u32(message.len() as u32);
@@ -140,6 +125,8 @@ impl Server {
     }
 
     pub fn stop(self) {
-        self.stop.send(());
+        if !self.stop.is_canceled() {
+            self.stop.send(()).unwrap();
+        }
     }
 }
