@@ -6,60 +6,60 @@ use std::time::Duration;
 use env_logger::Builder;
 use log::{info};
 use crate::server::{ServerBuilder, start_test_server};
-use crate::{DEFAULT_KEY_TYPE};
+use crate::{DEFAULT_KEY_TYPE, client};
 use whitenoisers::sdk::client::Client;
 use libp2p::bytes::BufMut;
+use crate::client::send_request;
 
-pub const LOCAL_BOOTSTRAP_ADDRESS: &str = "/ip4/127.0.0.1/tcp/6661/p2p/12D3KooWMNFaCGrnfMomi4TTMvQsKMGVwoxQzHo6P49ue6Fwq6zU";
+const TEST_BOOTSTRAP_ADDRESS: &str = "/ip4/127.0.0.1/tcp/6661/p2p/12D3KooWMNFaCGrnfMomi4TTMvQsKMGVwoxQzHo6P49ue6Fwq6zU";
+const TEST_SERVER_ID: &str = "05aMGHVxUaPerqgDSSxwWsS3G7cyJhHbJx9id6YfUMkLg";
 
 #[async_std::test]
 async fn single_request_test() {
     crate::logger::init_log();
-    let server = start_test_server(LOCAL_BOOTSTRAP_ADDRESS).await;
-    let response = async_std::task::spawn(send_request(server.unwrap().whitenosie_id())).await;
+    let server = start_test_server(TEST_BOOTSTRAP_ADDRESS).await;
+    let request = "{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}\n";
+    let response = async_std::task::spawn(send_request(TEST_BOOTSTRAP_ADDRESS, server.unwrap().whitenosie_id(), request.to_string())).await;
     info!("get response: {}", response);
     let response_expect = "{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}";
     assert_eq!(response, response_expect)
 }
 
-async fn send_request(whitenoise_id: String) -> String {
-    let keypair = libp2p::core::identity::Keypair::generate_ed25519();
-    let mut client = whitenoisers::sdk::client::WhiteNoiseClient::init(
-        LOCAL_BOOTSTRAP_ADDRESS.to_string(),
-        whitenoisers::account::key_types::KeyType::from_text_str(DEFAULT_KEY_TYPE),
-        Some(keypair));
+#[async_std::test]
+async fn substrate_request_test() {
+    crate::logger::init_log();
+    let insert_key_request = "{
+    \"jsonrpc\":\"2.0\",
+     \"id\":1,
+     \"method\":\"author_insertKey\",
+     \"params\": [
+    \"aura\",
+    \"clip organ olive upper oak void inject side suit toilet stick narrow\",
+    \"0x9effc1668ca381c242885516ec9fa2b19c67b6684c02a8a3237b6862e5c8cd7e\"
+    ]\
+    }";
+    let response = async_std::task::block_on(client::send_request(TEST_BOOTSTRAP_ADDRESS, TEST_SERVER_ID.to_string(), insert_key_request.to_string()));
+    let expect_res = "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":1}";
+    info!("{}", response);
+    assert_eq!(response, expect_res.to_string());
 
-    let peer_list = client.get_main_net_peers(10).await;
-    let mut index = rand::random::<usize>();
-    index %= peer_list.len();
-    let proxy_remote_id = peer_list.get(index).unwrap();
-    client.register(*proxy_remote_id).await;
+    async_std::task::sleep(Duration::from_secs(1));
 
-    let session_id = client.dial(whitenoise_id).await;
-    async_std::task::sleep(Duration::from_secs(1)).await;
-
-    let mut circuit = client.get_circuit(session_id.as_str()).unwrap();
-    let session_id = client.notify_next_session().await.unwrap();
-    info!("{}", session_id.clone());
-    info!("{:?}", circuit.transport_state.is_none());
-
-    let data: Vec<u8> = b"{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}\n"[..].to_owned();
-    let message = data.as_slice();
-    let mut payload = Vec::with_capacity(4 + message.len());
-    payload.put_u32(message.len() as u32);
-    payload.chunk_mut().copy_from_slice(message);
-    unsafe {
-        payload.advance_mut(message.len());
-    }
-
-    client.send_message(session_id.as_str(), &payload).await;
-    info!("finish send request");
-
-    let mut buf = [0u8; 1024];
-    let data = circuit.read(&mut buf).await;
-    let response = String::from_utf8_lossy(data.as_slice()).to_owned();
-    response.to_string()
+    let has_key_request: &str = "{
+  \"jsonrpc\":\"2.0\",
+  \"id\":1,
+  \"method\":\"author_hasKey\",
+  \"params\": [
+    \"0x9effc1668ca381c242885516ec9fa2b19c67b6684c02a8a3237b6862e5c8cd7e\",
+    \"aura\"
+  ]\
+  }";
+    let response = async_std::task::block_on(client::send_request(TEST_BOOTSTRAP_ADDRESS, TEST_SERVER_ID.to_string(), has_key_request.to_string()));
+    let expect_response = "{\"jsonrpc\":\"2.0\",\"result\":true,\"id\":1}";
+    info!("{}", response);
+    assert_eq!(response, expect_response.to_string());
 }
+
 
 #[async_std::test]
 async fn test_stream() {

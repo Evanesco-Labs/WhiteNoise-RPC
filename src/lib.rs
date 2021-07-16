@@ -1,10 +1,10 @@
-mod logger;
-mod meta;
-mod server;
+pub mod logger;
+pub mod meta;
+pub mod server;
 mod tests;
+pub mod client;
 
 pub const DEFAULT_KEY_TYPE: &str = "ed25519";
 
-#[cfg(test)]
 #[macro_use]
-extern crate lazy_static;
+extern crate log;

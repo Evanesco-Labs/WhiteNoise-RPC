@@ -11,27 +11,27 @@ use jsonrpc_core::futures::Future;
 use futures::future;
 use libp2p::bytes::BufMut;
 use log::{info};
+use crate::meta::{NoopExtractor, MetaExtractor, RequestContext};
 
 const MAXREQUESTSIZE: usize = 1024;
 const MAXRESPONSESIZE: usize = 1024;
 
 pub struct Server {
     bootstrap_addr: String,
-    keypair: libp2p::identity::Keypair,
     whitenoise_id: String,
     stop: futures::channel::oneshot::Sender<()>,
 }
 
-pub struct ServerBuilder {
-    handler: Arc<MetaIoHandler<(), middleware::Noop>>,
+pub struct ServerBuilder<M: Metadata = (), S: Middleware<M> = middleware::Noop> {
+    handler: Arc<MetaIoHandler<M, S>>,
     bootstrap_addr: String,
-    keypair: libp2p::identity::Keypair,
+    keypair: Option<libp2p::identity::Keypair>,
 }
 
-impl ServerBuilder {
-    pub fn new<T>(bootstrap_addr: &str, keypair: libp2p::identity::Keypair, handler: T) -> Self
+impl<M: Metadata + Default, S: Middleware<M>> ServerBuilder<M, S> {
+    pub fn new<T>(bootstrap_addr: &str, keypair: Option<libp2p::identity::Keypair>, handler: T) -> ServerBuilder<M, S>
         where
-            T: Into<MetaIoHandler<(), middleware::Noop>>,
+            T: Into<MetaIoHandler<M, S>>,
     {
         ServerBuilder {
             handler: Arc::new(handler.into()),
@@ -40,11 +40,13 @@ impl ServerBuilder {
         }
     }
 
+    //todo: over stack
     pub async fn start(&mut self) -> std::io::Result<Server> {
+        //todo: stop
         let (stop_sender, stop_rec) = futures::channel::oneshot::channel::<()>();
 
         let rpc_handler = self.handler.clone();
-        let mut client = whitenoisers::sdk::client::WhiteNoiseClient::init(self.bootstrap_addr.clone(), KeyType::ED25519, Some(self.keypair.clone()));
+        let mut client = whitenoisers::sdk::client::WhiteNoiseClient::init(self.bootstrap_addr.clone(), KeyType::ED25519, self.keypair.clone());
         let handler = rpc_handler.clone();
 
         let peer_list = client.get_main_net_peers(10).await;
@@ -80,7 +82,12 @@ impl ServerBuilder {
                         break;
                     }
                     let request = String::from_utf8_lossy(&data).into_owned();
-                    let response = handler.handle_request(&request, ()).wait().unwrap_or(Some({ "rpc handle err".to_string() }));
+
+                    let extractor = NoopExtractor {};
+                    let meta = extractor.extract(&RequestContext {
+                        session_id: circuit.id.clone(),
+                    });
+                    let response = handler.handle_request(&request, meta).wait().unwrap_or(Some({ "rpc handle err".to_string() }));
                     let response_bytes = response.unwrap_or("response none".to_string()).as_bytes().to_vec();
                     let payload = wrap_message(&response_bytes);
                     let mut buf = [0u8; MAXRESPONSESIZE];
@@ -96,7 +103,6 @@ impl ServerBuilder {
 
         Ok(Server {
             bootstrap_addr: self.bootstrap_addr.clone(),
-            keypair: self.keypair.clone(),
             whitenoise_id,
             stop: stop_sender,
         })
@@ -106,7 +112,7 @@ impl ServerBuilder {
 pub async fn start_test_server(bootstrap_addr: &str) -> std::io::Result<Server> {
     let keypair = libp2p::identity::Keypair::generate_ed25519();
     let mut io = test_handler();
-    let mut builder = ServerBuilder::new(bootstrap_addr, keypair, io);
+    let mut builder = ServerBuilder::new(bootstrap_addr, Some(keypair), io);
     async_std::task::spawn(async move {
         builder.start().await
     }).await
@@ -132,38 +138,8 @@ impl Server {
     pub fn whitenosie_id(&self) -> String {
         self.whitenoise_id.clone()
     }
+
+    pub fn stop(self) {
+        self.stop.send(());
+    }
 }
-
-//
-// pub struct CircuitStream(pub WhiteNoiseClient);
-//
-// impl futures::Stream for CircuitStream {
-//     type Item = CircuitConn;
-//
-//     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-//         unimplemented!()
-//     }
-// }
-
-//
-// pub struct WhiteNoiseSocket(pub CircuitConn);
-//
-// impl AsyncRead for WhiteNoiseSocket {
-//     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
-//         unimplemented!()
-//     }
-// }
-//
-// impl AsyncWrite for WhiteNoiseSocket {
-//     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
-//         unimplemented!()
-//     }
-//
-//     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
-//         unimplemented!()
-//     }
-//
-//     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
-//         unimplemented!()
-//     }
-// }

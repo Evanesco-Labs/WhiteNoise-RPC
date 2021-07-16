@@ -1,6 +1,8 @@
+#![allow(dead_code)]
 use env_logger::Builder;
 use log::LevelFilter;
 use std::env;
+use lazy_static::lazy_static;
 
 lazy_static! {
 	static ref LOG_DUMMY: bool = {

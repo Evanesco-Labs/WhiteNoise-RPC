@@ -5,8 +5,8 @@ use jsonrpc_core::Metadata;
 pub struct RequestContext {
     /// Circuit Connection SessionID
     pub session_id: String,
-    /// Peer Sender channel
-    pub sender: mpsc::Sender<String>,
+    // Peer Sender channel
+    // pub sender: mpsc::Sender<String>,
 }
 
 /// Metadata extractor (per session)
