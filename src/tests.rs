@@ -89,7 +89,6 @@ async fn test_stream() {
     stop.await.unwrap();
 }
 
-#[allow(dead_code)]
 pub async fn start_test_server(bootstrap_addr: &str) -> std::io::Result<Server> {
     let keypair = libp2p::identity::Keypair::generate_ed25519();
     let io = test_handler();
@@ -99,7 +98,6 @@ pub async fn start_test_server(bootstrap_addr: &str) -> std::io::Result<Server> 
     }).await
 }
 
-#[allow(dead_code)]
 pub fn test_handler() -> MetaIoHandler<()> {
     let mut io = MetaIoHandler::<()>::default();
     io.add_method("say_hello", |_params| Ok(Value::String("hello".to_string())));

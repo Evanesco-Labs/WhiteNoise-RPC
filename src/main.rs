@@ -6,7 +6,7 @@ use clap::{App, Arg};
 
 #[async_std::main]
 async fn main() {
-    crate::logger::init_log();
+    // crate::logger::init_log();
     let args = App::new("whitenoise-rpc-cli")
         .version("1.0")
         .author("EVA-Labs")
