@@ -86,3 +86,29 @@ Run this command to explore all parameters and commands:
 ./target/release/whitenoise-rpc -h
 ```
 
+## Test
+Tests including rpc requests to example rpc server and substrate WhiteNoise-based rpc server. 
+So before start testing you have to first start a local WhiteNoise network, follow this [instruction](https://github.com/Evanesco-Labs/WhiteNoise.rs#start-local-whitenoise-network).
+Remember the bootstrap node address shown in log.
+For better description, we assume that the bootstrap node address we start is `/ip4/118.190.163.66/tcp/3331/p2p/12D3KooWJGJ1guC3JsVWWpx6N5acGEzpMZbFDbNpAnZkU6ADwwPA`.
+
+Then startup a substrate node-template with WhiteNoise-based rpc on, follow this [instruction](https://github.com/Evanesco-Labs/substrate#start-substrate-node-template).
+Notice that you should fill in the `--whitenoise-bootstrap` with the bootstrap node address you've just started. In this case, it's `/ip4/118.190.163.66/tcp/3331/p2p/12D3KooWJGJ1guC3JsVWWpx6N5acGEzpMZbFDbNpAnZkU6ADwwPA`.
+
+Remember this WhiteNoiseID printed in your log. Here the WhiteNoiseID is `07sYJEC6MiSP6PZBuhq6KJUwgHhJNvwVWipySMR8peVJs` in the following log:
+
+```shell
+2021-06-28T05:39:36.426Z INFO  whitenoisers::network::node] [WhiteNoise] local whitenoise id:07sYJEC6MiSP6PZBuhq6KJUwgHhJNvwVWipySMR8peVJs
+```
+
+Change two const values in file `./src/tests.rs` to customize local test network:
+1. Change `const TEST_BOOTSTRAP_ADDRESS` to your local bootstrap node address:
+  
+`const TEST_BOOTSTRAP_ADDRESS: &str = "/ip4/127.0.0.1/tcp/6661/p2p/12D3KooWMNFaCGrnfMomi4TTMvQsKMGVwoxQzHo6P49ue6Fwq6zU";`
+
+2. Change `const TEST_SERVER_ID` to your substrate node-template WhiteNoiseID:
+
+`const TEST_SERVER_ID: &str = "06ASf5EcmmEHTgDJ4X4ZT5vT6iHVJBXPg5AN5YoTCpGWt";`
+
+Finally run this command to test:
+`cargo test`
