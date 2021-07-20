@@ -6,7 +6,7 @@ use futures::StreamExt;
 use jsonrpc_core::futures::Future;
 
 const TEST_BOOTSTRAP_ADDRESS: &str = "/ip4/127.0.0.1/tcp/6661/p2p/12D3KooWMNFaCGrnfMomi4TTMvQsKMGVwoxQzHo6P49ue6Fwq6zU";
-const TEST_SERVER_ID: &str = "05aMGHVxUaPerqgDSSxwWsS3G7cyJhHbJx9id6YfUMkLg";
+const TEST_SERVER_ID: &str = "06ASf5EcmmEHTgDJ4X4ZT5vT6iHVJBXPg5AN5YoTCpGWt";
 
 #[async_std::test]
 async fn single_request_test() {
@@ -52,41 +52,6 @@ async fn substrate_request_test() {
     let expect_response = "{\"jsonrpc\":\"2.0\",\"result\":true,\"id\":1}";
     info!("{}", response);
     assert_eq!(response, expect_response.to_string());
-}
-
-
-#[async_std::test]
-async fn test_stream() {
-    crate::logger::init_log();
-
-    let (_s, stop) = futures::channel::oneshot::channel::<()>();
-    let mut io = MetaIoHandler::<()>::default();
-    io.add_method("say_hello", |_params| Ok(Value::String("hello".to_string())));
-
-    let (tx, rx) = futures::channel::mpsc::unbounded::<&str>();
-    let (sender, receiver) = futures::channel::mpsc::unbounded::<Option<String>>();
-    let response = rx.for_each(move |req| {
-        info!("handle req");
-        let res = io.handle_request(req, ()).wait().unwrap();
-        sender.unbounded_send(res).unwrap();
-        futures::future::ready(())
-    });
-
-    async_std::task::spawn(response);
-
-    async_std::task::spawn(receiver.for_each(|res| {
-        info!("response {:?}", res);
-        futures::future::ready(())
-    }));
-
-    info!("send");
-    tx.unbounded_send("{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}\n").unwrap();
-    async_std::task::sleep(Duration::from_secs(1)).await;
-    tx.unbounded_send("{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}\n").unwrap();
-    async_std::task::sleep(Duration::from_secs(1)).await;
-    tx.unbounded_send("{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}\n").unwrap();
-    async_std::task::sleep(Duration::from_secs(1)).await;
-    stop.await.unwrap();
 }
 
 pub async fn start_test_server(bootstrap_addr: &str) -> std::io::Result<Server> {
