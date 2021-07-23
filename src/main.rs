@@ -1,8 +1,5 @@
-
-use whitenoise_rpc::{client, logger};
-
+use whitenoise_rpc::client;
 use clap::{App, Arg};
-
 
 #[async_std::main]
 async fn main() {
