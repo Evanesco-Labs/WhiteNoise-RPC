@@ -15,12 +15,10 @@ pub async fn send_request(boostrap_addr: &str, whitenoise_id: String, request: S
     index %= peer_list.len();
     let proxy_remote_id = peer_list.get(index).unwrap();
     client.register(*proxy_remote_id).await;
-
-    let session_id = client.dial(whitenoise_id).await;
-    async_std::task::sleep(Duration::from_secs(1)).await;
+    client.dial(whitenoise_id).await;
+    let session_id = client.notify_next_session().await.unwrap();
 
     let mut circuit = client.get_circuit(session_id.as_str()).unwrap();
-    let session_id = client.notify_next_session().await.unwrap();
     info!("{}", session_id.clone());
     info!("{:?}", circuit.transport_state.is_none());
 
